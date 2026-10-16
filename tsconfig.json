@@ -8,5 +8,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["netlify/**/*.mts", "netlify/types.d.ts"]
+  "include": ["netlify/**/*.mts", "netlify/types.d.ts"],
+  "exclude": ["netlify/**/*.test.mts"]
 }

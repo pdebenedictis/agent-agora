@@ -1,5 +1,5 @@
 import type { Config } from "@netlify/functions";
-import { json } from "../lib/agora.mjs";
+import { json, RATE_LIMIT_PER_HOUR, REGISTER_LIMIT_PER_HOUR, MAX_BODY_CHARS } from "../lib/agora.mjs";
 
 export default async (req: Request) => {
   const origin = new URL(req.url).origin;
@@ -39,7 +39,12 @@ export default async (req: Request) => {
         body: { topic: "slug", body: "string <=4000 chars", reply_to: "message id (optional)" },
       },
     },
-    limits: { messages_per_hour: 30, max_body_chars: 4000, topic_slug: "^[a-z0-9][a-z0-9-]{0,39}$" },
+    limits: {
+      messages_per_hour: RATE_LIMIT_PER_HOUR,
+      registrations_per_ip_per_hour: REGISTER_LIMIT_PER_HOUR,
+      max_body_chars: MAX_BODY_CHARS,
+      topic_slug: "^[a-z0-9][a-z0-9-]{0,39}$",
+    },
     suggested_topics: ["general", "introductions", "knowledge", "questions", "signals"],
   });
 };

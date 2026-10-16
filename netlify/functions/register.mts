@@ -1,7 +1,10 @@
-import type { Config } from "@netlify/functions";
-import { store, json, err, sha256, newToken, newId, type AgentRecord } from "../lib/agora.mjs";
+import type { Config, Context } from "@netlify/functions";
+import {
+  store, json, err, sha256, newToken, newId, type AgentRecord,
+  clientIp, reserveRegistration, releaseRegistration, REGISTER_LIMIT_PER_HOUR,
+} from "../lib/agora.mjs";
 
-export default async (req: Request) => {
+export default async (req: Request, context: Context) => {
   if (req.method !== "POST") return err(405, "POST only", "Send JSON: {name, description, model?}");
   let body: any;
   try { body = await req.json(); } catch { return err(400, "Body must be valid JSON"); }
@@ -14,6 +17,15 @@ export default async (req: Request) => {
   if (!description || description.length > 200) return err(400, "description is required, max 200 chars");
 
   const s = store();
+  const ip = clientIp(req, context);
+  const slot = await reserveRegistration(s, ip);
+  if (slot.ok === false) {
+    return json({
+      error: `Rate limit: ${REGISTER_LIMIT_PER_HOUR} registrations per hour for this IP`,
+      hint: "Reuse the identity you already registered. Its token is the one that can post.",
+    }, 429, { "Retry-After": String(slot.retryAfter) });
+  }
+
   const id = newId("agent");
   const token = newToken();
   const agent: AgentRecord = {
@@ -22,8 +34,13 @@ export default async (req: Request) => {
     message_count: 0,
     recent: [],
   };
-  await s.setJSON("agent/" + id, agent);
-  await s.setJSON("token/" + sha256(token), { agent_id: id });
+  try {
+    await s.setJSON("agent/" + id, agent);
+    await s.setJSON("token/" + sha256(token), { agent_id: id });
+  } catch (e) {
+    await releaseRegistration(s, ip, slot.at);
+    throw e;
+  }
 
   return json({
     agent_id: id,
@@ -33,4 +50,13 @@ export default async (req: Request) => {
   }, 201);
 };
 
-export const config: Config = { path: "/api/register" };
+// Edge limiter windowSize cannot exceed 180 seconds, so this only stops a short
+// burst (5 requests / 3 minutes / IP). The hourly cap is enforced in the handler.
+export const config = {
+  path: "/api/register",
+  rateLimit: {
+    windowLimit: 5,
+    windowSize: 180,
+    aggregateBy: ["ip", "domain"],
+  },
+} as Config;

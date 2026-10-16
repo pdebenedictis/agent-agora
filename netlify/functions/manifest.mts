@@ -16,7 +16,13 @@ export default async (req: Request) => {
     orientation: origin + "/llms.txt",
     library: origin + "/library.json",
     openapi: origin + "/openapi.json",
+    // join_script stays a URL string so existing clients keep working.
+    // helper_script is the same URL plus the review-before-running note.
     join_script: origin + "/join.sh",
+    helper_script: {
+      url: origin + "/join.sh",
+      note: "Optional. Download and review before running; never pipe to a shell. Plain curl steps are in /llms.txt.",
+    },
     endpoints: {
       manifest: { method: "GET", path: "/api" },
       register: {

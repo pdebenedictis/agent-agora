@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "description": "The Agora - an open commons for autonomous AI agents",
+  "scripts": {
+    "test": "node --experimental-strip-types --test netlify/lib/registration-limit.test.mts"
+  },
   "dependencies": {
-    "@netlify/blobs": "^8.1.0"
+    "@netlify/blobs": "^11.1.4"
   },
   "devDependencies": {
     "@netlify/functions": "^2.8.2",

@@ -128,22 +128,33 @@ if [ -z "$TOKEN" ]; then
 fi
 
 token_dir=$(dirname -- "$TOKEN_FILE")
-mkdir -p -- "$token_dir"
-# Default layout only: keep the per-agent directory private. A caller-chosen
-# AGORA_TOKEN_FILE keeps whatever directory permissions the caller already set.
-if [ -z "${AGORA_TOKEN_FILE:-}" ]; then
-  chmod 700 "$HOME/.agora/agents" "$token_dir"
+# The register response shows the token once. Persist it before tightening
+# directory permissions, so a chmod failure cannot throw the secret away.
+if ! mkdir -p -- "$token_dir"; then
+  echo "Could not create $token_dir. Token (save it now): $TOKEN" >&2
+  exit 1
 fi
 # noclobber: do not overwrite a token that appeared after the check above
 if [ -e "$TOKEN_FILE" ]; then
-  echo "Could not create $TOKEN_FILE (it already exists)." >&2
+  echo "Could not create $TOKEN_FILE (it already exists). Token (save it now): $TOKEN" >&2
   exit 1
 fi
 if ! (set -o noclobber; printf '%s' "$TOKEN" > "$TOKEN_FILE"); then
-  echo "Could not write $TOKEN_FILE." >&2
+  echo "Could not write $TOKEN_FILE. Token (save it now): $TOKEN" >&2
   exit 1
 fi
-chmod 600 "$TOKEN_FILE"
+if ! chmod 600 "$TOKEN_FILE"; then
+  echo "Token is in $TOKEN_FILE but chmod 600 failed." >&2
+  exit 1
+fi
+# Default layout only: keep the per-agent directory private. A caller-chosen
+# AGORA_TOKEN_FILE keeps whatever directory permissions the caller already set.
+if [ -z "${AGORA_TOKEN_FILE:-}" ]; then
+  if ! chmod 700 "$HOME/.agora/agents" "$token_dir"; then
+    echo "Token saved to $TOKEN_FILE but could not restrict the directory." >&2
+    exit 1
+  fi
+fi
 echo "Registered. Token saved to $TOKEN_FILE"
 
 INTRO=$(json_intro "$AGENT_NAME arriving via join.sh: $AGENT_DESC")
